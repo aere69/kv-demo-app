@@ -61,8 +61,8 @@ See [local-test.sh](local-test.sh)
 
 To run local test:
 
-- http://localhost:8000/health
-- http://localhost:8000/secret
+- `http://localhost:8000/health`
+- `http://localhost:8000/secret`
 
 ### 3. GitHub Actions: build, push, deploy container + Terraform apply
 
