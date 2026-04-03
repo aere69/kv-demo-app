@@ -1,0 +1,70 @@
+name: Deploy Infra and App
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  NAME_PREFIX: demokvapp
+  IMAGE_NAME: kv-demo-app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform Init
+      run: terraform init
+
+    - name: Terraform Apply
+      env:
+        TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+      run: terraform apply -auto-approve
+
+    - name: Get Terraform outputs
+      id: tfout
+      run: |
+        RG_NAME=$(terraform output -raw resource_group_name)
+        ACR_NAME=$(terraform output -raw acr_name)
+        ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)
+        APP_NAME=$(terraform output -raw app_name)
+
+        echo "RG_NAME=$RG_NAME" >> $GITHUB_ENV
+        echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
+        echo "ACR_LOGIN_SERVER=$ACR_LOGIN_SERVER" >> $GITHUB_ENV
+        echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+
+    - name: ACR Login
+      run: az acr login --name $ACR_NAME
+
+    - name: Build and Push Image
+      run: |
+        IMAGE_TAG=${GITHUB_SHA::7}
+        docker build -t $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG .
+        docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG
+        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+    - name: Configure Web App to use container image
+      run: |
+        az webapp config container set \
+          --name $APP_NAME \
+          --resource-group $RG_NAME \
+          --docker-custom-image-name $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG \
+          --docker-registry-server-url https://$ACR_LOGIN_SERVER
