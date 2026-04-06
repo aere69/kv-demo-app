@@ -64,16 +64,26 @@ To run local test:
 - `http://localhost:8000/health`
 - `http://localhost:8000/secret`
 
-### 3. GitHub Actions: build, push, deploy container + Terraform apply
+### 3. GitHub Actions Workflow: build, push, deploy container + Terraform apply
+
+This workflow:
+
+1. Logs into Azure using OIDC (no secrets)
+2. Runs Terraform to deploy infra
+3. Builds Docker image
+4. Pushes image to ACR
+5. Updates the Web App to use the new image
 
 See [deploy.yml](.github/workflows/deploy.yml)
 
 GitHub secrets needed:
 
-- `AZURE_CLIENT_ID`
-- `AZURE_TENANT_ID`
-- `AZURE_SUBSCRIPTION_ID`
-- `DB_PASSWORD`
+| Secret | Purpose |
+| ------ | ----------- |
+| `AZURE_CLIENT_ID` | Federated idebtity for GitHub OIDC |
+| `AZURE_TENANT_ID` | Azure Tenant |
+| `AZURE_SUBSCRIPTION_ID` | Subscription |
+| `DB_PASSWORD` | Real Database Password |
 
 ### 4. How this ties together
 
